@@ -1,7 +1,7 @@
 # ==========================================
-# 📡 마스터 헌터: 실시간 포착 + 캐시 문제 해결 (Final V2)
+# 📡 마스터 헌터: 프리장/애프터장 데이터 잠금해제 (Real Final)
 # 기능: 1. 실행 알림
-#       2. 무조건 최신 데이터 강제 로드 (중복 방지)
+#       2. 프리마켓(prepost) 데이터 강제 로드 ★핵심★
 #       3. 진입/손절/목표가 리포트
 # ==========================================
 
@@ -38,7 +38,6 @@ def send_telegram(msg):
 # --- 종목 발굴 레이더 ---
 def get_hot_symbols():
     print("📡 시장 스캔 중...")
-    hot_list = []
     try:
         # 급등주 + 거래량 상위 + 내 관심종목
         gainers = si.get_day_gainers().head(10)['Symbol'].tolist()
@@ -97,15 +96,15 @@ def analyze_market(ticker, df):
 if __name__ == "__main__":
     print(f"[{get_now()}] 봇 실행")
     
-    # 실행 알림 (봇 생존신고)
-    send_telegram(f"🤖 주식분석봇 가동\n({get_now()})\n시장 감시를 시작합니다.")
+    # 실행 알림
+    send_telegram(f"🤖 봇 재가동 (프리장 데이터 적용)\n({get_now()})")
 
     try:
         targets = get_hot_symbols()
         
-        # ★★★ [수정된 부분] 데이터 강제 새로고침 옵션 추가 ★★★
-        # ignore_tz=True, auto_adjust=True 옵션으로 최신 데이터 강제 로드
-        data = yf.download(targets, period="5d", interval="5m", progress=False, ignore_tz=True, auto_adjust=True)
+        # ★★★ [여기가 핵심입니다] prepost=True 추가 ★★★
+        # 이제 프리마켓(장전) 실시간 가격을 가져옵니다.
+        data = yf.download(targets, period="5d", interval="5m", progress=False, prepost=True)
 
         if not data.empty:
             for ticker in targets:
@@ -122,21 +121,21 @@ if __name__ == "__main__":
                     
                     score, reasons, price = analyze_market(ticker, df)
                     
-                    # ★ [전략 계산] 손절가/목표가
-                    stop_loss = price * 0.965  # -3.5% 손절
-                    target_price = price * 1.05 # +5.0% 익절
+                    # 손절/목표가 계산
+                    stop_loss = price * 0.965
+                    target_price = price * 1.05
                     
-                    # 70점 이상이면 알림
+                    # 70점 이상 알림
                     if score >= 70:
                         reasons_txt = ", ".join(reasons)
-                        msg = f"""🛰️ [급등주 포착] {ticker}
+                        msg = f"""🛰️ [실시간 포착] {ticker}
 📊 점수: {score}점
 💰 현재가: ${price:.2f}
 --------------------
-🛑 손절가: ${stop_loss:.2f} (-3.5%)
-🎯 목표가: ${target_price:.2f} (+5.0%)
+🛑 손절가: ${stop_loss:.2f}
+🎯 목표가: ${target_price:.2f}
 --------------------
-[분석] {reasons_txt}"""
+[이유] {reasons_txt}"""
                         send_telegram(msg)
                         print(f"🔔 알림: {ticker}")
                         
