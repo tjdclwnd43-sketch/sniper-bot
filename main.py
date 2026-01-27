@@ -146,9 +146,9 @@ try:
     # [생존 신고] 종목을 하나도 못 찾았어도 "살아있다"고 보고하기
     if found_stocks == 0:
         print("📭 조건에 맞는 급등주가 없습니다.")
-        # 너무 조용한 게 싫으면 아래 줄 주석(#)을 지우세요. 매번 텔레그램이 옵니다.
-        send_telegram(f"[{get_now()}] 봇 생존! 하지만 70점 넘는 종목이 없습니다. (다음 스캔 대기)")
+        # 아래 줄 샵(#) 제거 완료됨
+        send_telegram(f"[{get_now()}] 봇 생존! 종목 찾는 중... (이상 무)")
 
 except Exception as e:
     print(f"에러 발생: {e}")
-    send_telegram(f"⚠️ 봇 에러 발생: {e}"))
+    send_telegram(f"⚠️ 봇 에러 발생: {e}")
