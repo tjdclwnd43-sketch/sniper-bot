@@ -103,28 +103,52 @@ try:
                 
                 score, reasons, price = analyze_market(ticker, df)
                 
-                # [알림 발송] 70점 이상일 때 매매 가이드 포함해서 전송
+                # ... (위쪽 코드는 그대로 두세요) ...
+
+# --- [3. 메인 실행] ---
+print(f"[{get_now()}] 🚀 헌터 봇 가동 시작")
+
+targets = get_hot_symbols()
+print(f"👉 타겟 확인: {targets}")
+
+found_stocks = 0  # 찾은 종목 수 카운트
+
+try:
+    data = yf.download(targets, period="5d", interval="5m", progress=False)
+    if not data.empty:
+        for ticker in targets:
+            try:
+                try: df = data.xs(ticker, axis=1, level=1)
+                except: df = data
+                if len(df) < 30: continue
+                
+                # 지표 계산
+                df['RSI_14'] = ta.rsi(df['Close'], length=14)
+                df = pd.concat([df, ta.macd(df['Close'])], axis=1)
+                
+                score, reasons, price = analyze_market(ticker, df)
+                
+                # [70점 이상] -> 강력 매수 신호 (텔레그램 전송)
                 if score >= 70:
-                    # [자동 매매 가이드 계산]
-                    # 급등주 특성상: 손절은 짧게(-3%), 익절은 길게(+5%~10%) 잡음
+                    found_stocks += 1
                     stop_loss = price * 0.97
                     target_price = price * 1.05
-                    
-                    msg = f"""🎯 [매수 신호 포착]
-종목: {ticker}
-점수: {score}점
---------------------
-💰 현재가: ${price:.2f}
-🚀 목표가: ${target_price:.2f} (+5%)
-🛡️ 손절가: ${stop_loss:.2f} (-3%)
---------------------
-[추천 이유]
-{', '.join(reasons)}
---------------------
-※ 이 가격 전략은 봇의 추천입니다.
-진입 시 손절가는 반드시 HTS에 걸어두세요."""
-                    
+                    msg = f"🎯 [매수 신호] {ticker}\n점수: {score}점\n💰 현재가: ${price:.2f}\n🚀 목표가: ${target_price:.2f}\n🛡️ 손절가: ${stop_loss:.2f}\n이유: {', '.join(reasons)}"
                     send_telegram(msg)
                     print(f"🔔 알림 전송: {ticker}")
+                
+                # [점수 미달] -> 로그만 남김 (나중에 확인용)
+                else:
+                    print(f"❌ {ticker}: {score}점 (탈락)")
+                    
             except: continue
-except Exception as e: print(e)
+
+    # [생존 신고] 종목을 하나도 못 찾았어도 "살아있다"고 보고하기
+    if found_stocks == 0:
+        print("📭 조건에 맞는 급등주가 없습니다.")
+        # 너무 조용한 게 싫으면 아래 줄 주석(#)을 지우세요. 매번 텔레그램이 옵니다.
+        # send_telegram(f"[{get_now()}] 봇 생존! 하지만 70점 넘는 종목이 없습니다. (다음 스캔 대기)")
+
+except Exception as e:
+    print(f"에러 발생: {e}")
+    send_telegram(f"⚠️ 봇 에러 발생: {e}"))
