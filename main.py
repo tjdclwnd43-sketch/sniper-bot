@@ -1,8 +1,8 @@
 # ==========================================
-# 📡 마스터 헌터: 프리장/애프터장 데이터 잠금해제 (Real Final)
-# 기능: 1. 실행 알림
-#       2. 프리마켓(prepost) 데이터 강제 로드 ★핵심★
-#       3. 진입/손절/목표가 리포트
+# 📡 마스터 헌터: 실시간 포착 + 프리장 데이터 적용 (Final Ver)
+# 기능: 1. 실행 시 "주식 분석 봇 실행이 완료 되었습니다" 알림
+#       2. 프리마켓(장전) 실시간 데이터 반영 (prepost=True)
+#       3. 퀀트 점수 70점 이상 시 진입/손절/목표가 리포트
 # ==========================================
 
 import os
@@ -96,14 +96,13 @@ def analyze_market(ticker, df):
 if __name__ == "__main__":
     print(f"[{get_now()}] 봇 실행")
     
-    # 실행 알림
-    send_telegram(f"🤖 봇 재가동 (프리장 데이터 적용)\n({get_now()})")
+    # ★ 요청하신 문구로 수정 완료 ★
+    send_telegram("[주식 분석 봇 실행이 완료 되었습니다]")
 
     try:
         targets = get_hot_symbols()
         
-        # ★★★ [여기가 핵심입니다] prepost=True 추가 ★★★
-        # 이제 프리마켓(장전) 실시간 가격을 가져옵니다.
+        # ★ 프리장 데이터 적용 (prepost=True) - 실시간 가격 반영
         data = yf.download(targets, period="5d", interval="5m", progress=False, prepost=True)
 
         if not data.empty:
@@ -132,8 +131,8 @@ if __name__ == "__main__":
 📊 점수: {score}점
 💰 현재가: ${price:.2f}
 --------------------
-🛑 손절가: ${stop_loss:.2f}
-🎯 목표가: ${target_price:.2f}
+🛑 손절가: ${stop_loss:.2f} (-3.5%)
+🎯 목표가: ${target_price:.2f} (+5.0%)
 --------------------
 [이유] {reasons_txt}"""
                         send_telegram(msg)
