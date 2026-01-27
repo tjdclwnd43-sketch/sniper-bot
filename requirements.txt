@@ -1,0 +1,6 @@
+yfinance
+pandas_ta
+requests
+pandas
+yahoo_fin
+requests_html
