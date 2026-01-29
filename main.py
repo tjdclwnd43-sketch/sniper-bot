@@ -6,7 +6,7 @@ import pytz
 from tradingview_ta import TA_Handler, Interval, Exchange
 
 # =========================================================
-# ⚙️ [설정] 마스터 헌터 봇 (거래소 패치 버전)
+# ⚙️ [설정] 마스터 헌터 봇 (최종 완성본)
 # =========================================================
 
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
@@ -17,18 +17,18 @@ ALERT_THRESHOLD = 80
 
 # 감시할 종목 리스트
 SYMBOLS = [
-    # 3배 레버리지 (주로 AMEX)
+    # [1] 3배 레버리지 (대부분 AMEX)
     "SOXL", "SOXS", "TQQQ", "SQQQ", "FNGU", "FNGD",
-    "BULZ", "LABU", "LABD", "YINN", "YANG", "TMF",
+    "BULZ", "LABU", "LABD", "YINN", "YANG", "TMF", "TMV",
     
-    # 비트코인 & 코인주
+    # [2] 비트코인 & 코인주 (NASDAQ)
     "MSTR", "MSTX", "MSTU", "COIN", "HOOD",
-    "MARA", "RIOT", "CLSK", "BITO",
-    
-    # 빅테크 & 반도체 (주로 NASDAQ)
+    "MARA", "RIOT", "CLSK", "BITO", "IBIT",
+
+    # [3] 빅테크 & 반도체 (NASDAQ)
     "NVDA", "TSLA", "AAPL", "MSFT", "GOOGL", "AMZN", "META",
     "AMD", "AVGO", "MU", "INTC", "ARM", "TSM", "SMCI",
-    "PLTR", "SOFI", "GME", "AMC"
+    "PLTR", "SOFI", "GME", "AMC", "RIVN", "LCID"
 ]
 
 # =========================================================
@@ -42,13 +42,16 @@ def send_telegram(msg):
         requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
     except: pass
 
-def get_exchange(symbol):
+def get_exchange_and_screener(symbol):
     """종목에 맞는 거래소를 자동으로 찾아줍니다"""
-    # AMEX에서 거래되는 주요 3배 ETF들
+    # AMEX 거래소 목록 (주로 3배 레버리지 ETF)
     amex_list = ["SOXL", "SOXS", "LABU", "LABD", "FNGU", "FNGD", "BULZ", "DPST", "NAIL", "YINN", "YANG"]
+    
     if symbol in amex_list:
-        return "AMEX" # ETF는 아멕스
-    return "NASDAQ"   # 나머지는 대부분 나스닥
+        return "AMEX"
+    
+    # 나머지는 대부분 NASDAQ
+    return "NASDAQ"
 
 def calculate_master_score(analysis):
     if analysis is None: return 0, 0
@@ -68,9 +71,10 @@ def run_bot():
     
     for sym in SYMBOLS:
         try:
-            # 거래소 자동 선택
-            my_exchange = get_exchange(sym)
+            # 1. 거래소 자동 선택
+            my_exchange = get_exchange_and_screener(sym)
             
+            # 2. 데이터 가져오기
             handler = TA_Handler(
                 symbol=sym,
                 screener="america",
@@ -79,12 +83,14 @@ def run_bot():
             )
             analysis = handler.get_analysis()
             
+            # 3. 점수 및 가격 계산
             score, buys = calculate_master_score(analysis)
             price = analysis.indicators['close']
             
-            # 로그 출력 (이제 $nan 없이 가격이 잘 나올 겁니다)
+            # 로그 출력 (확인용)
             # print(f"👉 {sym}: {score:.0f}점 (${price})")
             
+            # 4. 알림 조건 체크
             if score >= ALERT_THRESHOLD:
                 rsi = analysis.indicators.get('RSI', 0)
                 print(f"🔥 포착: {sym} ({score:.0f}점)")
@@ -96,9 +102,14 @@ def run_bot():
 📊 RSI: {rsi:.1f}
 --------------------"""
                 alert_messages.append(msg)
-                
+            
+            # 🔥 [핵심] 차단 방지를 위해 1초 쉬기 (천천히)
+            time.sleep(1)
+
         except Exception as e:
-            # print(f"⚠️ {sym} 에러: {e}")
+            # 에러 나면 그냥 넘어가고 다음 종목 봄
+            # print(f"⚠️ {sym} 패스")
+            time.sleep(1)
             continue
 
     if alert_messages:
