@@ -1,3 +1,4 @@
 tradingview-ta
 requests
-pytz
+pandas
+requests_html
