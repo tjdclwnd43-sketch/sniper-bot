@@ -6,26 +6,26 @@ import pytz
 from tradingview_ta import TA_Handler, Interval, Exchange
 
 # =========================================================
-# ⚙️ [설정] 마스터 헌터 봇 (최종 완성본)
+# ⚙️ [설정] 마스터 헌터 봇 (재시도 강화 버전)
 # =========================================================
 
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('CHAT_ID')
 
-# 🔥 기준 점수: 80 (테스트하려면 10으로 낮추세요)
+# 🔥 기준 점수: 80 (테스트 때는 10)
 ALERT_THRESHOLD = 80
 
 # 감시할 종목 리스트
 SYMBOLS = [
-    # [1] 3배 레버리지 (대부분 AMEX)
+    # [1] 3배 레버리지 (AMEX/NASDAQ 혼합)
     "SOXL", "SOXS", "TQQQ", "SQQQ", "FNGU", "FNGD",
     "BULZ", "LABU", "LABD", "YINN", "YANG", "TMF", "TMV",
     
-    # [2] 비트코인 & 코인주 (NASDAQ)
+    # [2] 비트코인 & 코인주
     "MSTR", "MSTX", "MSTU", "COIN", "HOOD",
     "MARA", "RIOT", "CLSK", "BITO", "IBIT",
 
-    # [3] 빅테크 & 반도체 (NASDAQ)
+    # [3] 빅테크 & 반도체
     "NVDA", "TSLA", "AAPL", "MSFT", "GOOGL", "AMZN", "META",
     "AMD", "AVGO", "MU", "INTC", "ARM", "TSM", "SMCI",
     "PLTR", "SOFI", "GME", "AMC", "RIVN", "LCID"
@@ -42,16 +42,40 @@ def send_telegram(msg):
         requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
     except: pass
 
-def get_exchange_and_screener(symbol):
-    """종목에 맞는 거래소를 자동으로 찾아줍니다"""
-    # AMEX 거래소 목록 (주로 3배 레버리지 ETF)
-    amex_list = ["SOXL", "SOXS", "LABU", "LABD", "FNGU", "FNGD", "BULZ", "DPST", "NAIL", "YINN", "YANG"]
-    
-    if symbol in amex_list:
+def get_exchange(symbol):
+    """거래소 자동 분류 (AMEX ETF와 NASDAQ 구분)"""
+    # AMEX에서 거래되는 주요 3배 ETF들
+    amex_etfs = ["SOXL", "SOXS", "LABU", "LABD", "FNGU", "FNGD", "BULZ", "DPST", "NAIL", "YINN", "YANG"]
+    if symbol in amex_etfs:
         return "AMEX"
+    return "NASDAQ" # TQQQ, SQQQ, MSTR 등은 NASDAQ임
+
+def get_data_with_retry(symbol):
+    """실패하면 3번까지 다시 시도하는 함수"""
+    my_exchange = get_exchange(symbol)
     
-    # 나머지는 대부분 NASDAQ
-    return "NASDAQ"
+    for i in range(3): # 총 3번 시도
+        try:
+            handler = TA_Handler(
+                symbol=symbol,
+                screener="america",
+                exchange=my_exchange,
+                interval=Interval.INTERVAL_5_MINUTES
+            )
+            analysis = handler.get_analysis()
+            
+            # 데이터가 정상인지 확인 (가격이 없으면 재시도)
+            if analysis is None or analysis.indicators['close'] is None:
+                raise Exception("데이터 없음")
+                
+            return analysis # 성공하면 리턴
+            
+        except Exception:
+            # 실패하면 1초 쉬고 다시 시도
+            time.sleep(1)
+            continue
+            
+    return None # 3번 다 실패하면 포기
 
 def calculate_master_score(analysis):
     if analysis is None: return 0, 0
@@ -71,26 +95,19 @@ def run_bot():
     
     for sym in SYMBOLS:
         try:
-            # 1. 거래소 자동 선택
-            my_exchange = get_exchange_and_screener(sym)
+            # 🔥 [핵심] 재시도 기능으로 데이터 가져오기
+            analysis = get_data_with_retry(sym)
             
-            # 2. 데이터 가져오기
-            handler = TA_Handler(
-                symbol=sym,
-                screener="america",
-                exchange=my_exchange,
-                interval=Interval.INTERVAL_5_MINUTES
-            )
-            analysis = handler.get_analysis()
-            
-            # 3. 점수 및 가격 계산
+            if analysis is None:
+                print(f"⚠️ {sym}: 데이터 불러오기 실패 ($nan)")
+                continue
+
             score, buys = calculate_master_score(analysis)
             price = analysis.indicators['close']
             
-            # 로그 출력 (확인용)
+            # 로그 출력 (성공한 것만)
             # print(f"👉 {sym}: {score:.0f}점 (${price})")
             
-            # 4. 알림 조건 체크
             if score >= ALERT_THRESHOLD:
                 rsi = analysis.indicators.get('RSI', 0)
                 print(f"🔥 포착: {sym} ({score:.0f}점)")
@@ -103,13 +120,10 @@ def run_bot():
 --------------------"""
                 alert_messages.append(msg)
             
-            # 🔥 [핵심] 차단 방지를 위해 1초 쉬기 (천천히)
-            time.sleep(1)
+            # 🔥 [안전] 봇 차단 방지를 위해 3초 휴식 (천천히)
+            time.sleep(3)
 
         except Exception as e:
-            # 에러 나면 그냥 넘어가고 다음 종목 봄
-            # print(f"⚠️ {sym} 패스")
-            time.sleep(1)
             continue
 
     if alert_messages:
