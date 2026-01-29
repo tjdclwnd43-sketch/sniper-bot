@@ -9,8 +9,8 @@ from tradingview_ta import TA_Handler, Interval, Exchange
 # ⚙️ [설정] 마스터 헌터 봇 (보안 패치 버전)
 # =========================================================
 
-# 🚨 [중요] 여기에 토큰을 직접 적으면 깃허브가 차단합니다!
-# 아래 코드는 깃허브 'Secrets'에서 토큰을 몰래 가져오는 방식입니다.
+# 🚨 [중요] 여기에 토큰을 직접 적지 마세요!
+# 깃허브 'Secrets'에서 안전하게 가져오는 코드입니다.
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('CHAT_ID')
 
